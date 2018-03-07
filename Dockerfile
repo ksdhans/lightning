@@ -81,8 +81,23 @@ ARG DEVELOPER=0
 RUN ./configure --prefix=/tmp/lightning_install --enable-static && make -j3 DEVELOPER=${DEVELOPER} && make install
 
 FROM debian:stretch-slim as final
+
+ARG TRACE_TOOLS=false
+ENV TRACE_TOOLS=$TRACE_TOOLS
+ENV TRACE_LOCATION=/opt/traces
+VOLUME /opt/traces
+
 COPY --from=downloader /opt/tini /usr/bin/tini
 RUN apt-get update && apt-get install -y --no-install-recommends socat inotify-tools \
+    && \
+    ( ! $TRACE_TOOLS || \
+        ( \
+            apt-get install -y --no-install-recommends perl linux-base curl ca-certificates && \
+            mkdir FlameGraph && cd FlameGraph && \
+            curl -Lo FlameGraph.tar.gz "https://github.com/brendangregg/FlameGraph/archive/v1.0.tar.gz" && \
+            tar -zxvf FlameGraph.tar.gz --strip-components=1 && rm FlameGraph.tar.gz && cd .. \
+        ) \
+    ) \
     && rm -rf /var/lib/apt/lists/*
 
 ENV LIGHTNINGD_DATA=/root/.lightning
