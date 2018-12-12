@@ -4,40 +4,31 @@
 
 cat <<-EOF > "$LIGHTNINGD_DATA/config"
 ${LIGHTNINGD_OPT}
+bind-addr=0.0.0.0:${LIGHTNINGD_PORT}
 EOF
 
 : "${EXPOSE_TCP:=false}"
 
-NETWORK=$(sed -n 's/^network=\(.*\)$/\1/p' < "$LIGHTNINGD_DATA/config")
-CHAIN=$(sed -n 's/^chain=\(.*\)$/\1/p' < "$LIGHTNINGD_DATA/config")
-sed -i '/^chain=/d' "$LIGHTNINGD_DATA/config"
+LIGHTNINGD_NETWORK_NAME=""
 
-if [[ ! $LIGHTNINGD_CHAIN ]]; then
-    CHAIN=$LIGHTNINGD_CHAIN
-fi
-if [[ ! $LIGHTNINGD_NETWORK ]]; then
-    NETWORK=$LIGHTNINGD_NETWORK
+if [ "$LIGHTNINGD_CHAIN" == "btc" ] && [ "$LIGHTNINGD_NETWORK" == "mainnet" ]; then
+    LIGHTNINGD_NETWORK_NAME="bitcoin"
+elif [ "$LIGHTNINGD_CHAIN" == "btc" ] && [ "$LIGHTNINGD_NETWORK" == "testnet" ]; then
+    LIGHTNINGD_NETWORK_NAME="testnet"
+elif [ "$LIGHTNINGD_CHAIN" == "btc" ] && [ "$LIGHTNINGD_NETWORK" == "regtest" ]; then
+    LIGHTNINGD_NETWORK_NAME="regtest"
+elif [ "$LIGHTNINGD_CHAIN" == "ltc" ] && [ "$LIGHTNINGD_NETWORK" == "mainnet" ]; then
+    LIGHTNINGD_NETWORK_NAME="litecoin"
+elif [ "$LIGHTNINGD_CHAIN" == "ltc" ] && [ "$LIGHTNINGD_NETWORK" == "testnet" ]; then
+    LIGHTNINGD_NETWORK_NAME="litecoin-testnet"
+else
+    echo "Invalid combinaion of LIGHTNINGD_NETWORK and LIGHTNINGD_CHAIN. LIGHTNINGD_CHAIN should be btc or ltc. LIGHTNINGD_NETWORK should be mainnet, testnet or regtest."
+    echo "ltc regtest is not supported"
+    exit
 fi
 
-REPLACEDNETWORK="";
-if [ "$CHAIN" == "btc" ]; then
-    if [ "$NETWORK" == "mainnet" ]; then
-        REPLACEDNETWORK="bitcoin"
-    fi
-fi
-
-if [ "$CHAIN" == "ltc" ]; then
-    if [ "$NETWORK" == "mainnet" ]; then
-        REPLACEDNETWORK="litecoin"
-    fi
-    if [ "$NETWORK" == "testnet" ]; then
-        REPLACEDNETWORK="litecoin-testnet"
-    fi
-    if [ "$NETWORK" == "regtest" ]; then
-        echo "REGTEST NOT AVAILABLE FOR LTC"
-        exit
-    fi
-fi
+echo "network=$LIGHTNINGD_NETWORK_NAME" >> "$LIGHTNINGD_DATA/config"
+echo "network=$LIGHTNINGD_NETWORK_NAME added in $LIGHTNINGD_DATA/config"
 
 if [[ $TRACE_TOOLS == "true" ]]; then
 echo "Trace tools detected, installing sample.sh..."
@@ -70,26 +61,41 @@ done
 chmod +x /usr/bin/sample-loop.sh
 fi
 
-if [[ $REPLACEDNETWORK ]]; then
-    sed -i '/^network=/d' "$LIGHTNINGD_DATA/config"
-    echo "network=$REPLACEDNETWORK" >> "$LIGHTNINGD_DATA/config"
-    echo "Replaced network $NETWORK by $REPLACEDNETWORK in $LIGHTNINGD_DATA/config"
+if [[ "${LIGHTNINGD_ANNOUNCEADDR}" ]]; then
+    echo "announce-addr=$LIGHTNINGD_ANNOUNCEADDR:${LIGHTNINGD_PORT}" >> "$LIGHTNINGD_DATA/config"
 fi
 
+if [[ "${LIGHTNINGD_ALIAS}" ]]; then
+    # This allow to strip this parameter if LND_ALIGHTNINGD_ALIASLIAS is empty or null, and truncate it
+    LIGHTNINGD_ALIAS="$(echo "$LIGHTNINGD_ALIAS" | cut -c -32)"
+    echo "alias=$LIGHTNINGD_ALIAS" >> "$LIGHTNINGD_DATA/config"
+    echo "alias=$LIGHTNINGD_ALIAS added to $LIGHTNINGD_DATA/config"
+fi
+
+if [[ "${LIGHTNINGD_READY_FILE}" ]]; then
+    echo "Waiting $LIGHTNINGD_READY_FILE to be created..."
+    while [ ! -f "$LIGHTNINGD_READY_FILE" ]; do sleep 1; done
+    echo "The chain is fully synched"
+fi
+
+if [[ "${LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE}" ]]; then
+    echo "Waiting $LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE to be created by tor..."
+    while [ ! -f "$LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE" ]; do sleep 1; done
+    HIDDENSERVICE_ONION="$(head -n 1 "$LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE"):${LIGHTNINGD_PORT}"
+    echo "announce-addr=$HIDDENSERVICE_ONION" >> "$LIGHTNINGD_DATA/config"
+    echo "announce-addr=$HIDDENSERVICE_ONION added to $LIGHTNINGD_DATA/config"
+fi
+
+echo "C-Lightning starting, listening on port ${LIGHTNINGD_PORT}"
 if [ "$EXPOSE_TCP" == "true" ]; then
     set -m
     lightningd "$@" &
     echo "C-Lightning starting"
     while read -r i; do if [ "$i" = "lightning-rpc" ]; then break; fi; done \
     < <(inotifywait  -e create,open --format '%f' --quiet "$LIGHTNINGD_DATA" --monitor)
-    echo "C-Lightning started"
     echo "C-Lightning started, RPC available on port $LIGHTNINGD_RPC_PORT"
-
     socat "TCP4-listen:$LIGHTNINGD_RPC_PORT,fork,reuseaddr" "UNIX-CONNECT:$LIGHTNINGD_DATA/lightning-rpc" &
     fg %-
 else
-    # NBXplorer.NodeWaiter.dll is a wrapper which wait the full node to be fully synced before starting c-lightning
-    # it also correctly handle SIGINT and SIGTERM so this container can die properly if SIGKILL or SIGTERM is sent
-    exec dotnet /opt/NBXplorer.NodeWaiter/NBXplorer.NodeWaiter.dll --chains "$CHAIN" --network "$NETWORK" --explorerurl "$LIGHTNINGD_EXPLORERURL" -- \
-    lightningd "$@"
+    exec lightningd "$@"
 fi

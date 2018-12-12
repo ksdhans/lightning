@@ -92,28 +92,15 @@ RUN git clone --recursive /tmp/lightning . && \
 ARG DEVELOPER=0
 RUN ./configure --prefix=/tmp/lightning_install --enable-static && make -j3 DEVELOPER=${DEVELOPER} && make install
 
-# This is a manifest image, will pull the image with the same arch as the builder machine
-FROM microsoft/dotnet:2.1.500-sdk AS dotnetbuilder
-
-RUN apt-get -y update && apt-get -y install git
-
-WORKDIR /source
-
-RUN git clone https://github.com/dgarage/NBXplorer && cd NBXplorer && git checkout de6245f0c90a07a676a2df2531bc8e553150a558
-
-# Cache some dependencies
-RUN cd NBXplorer/NBXplorer.NodeWaiter && dotnet restore && cd ..
-RUN cd NBXplorer/NBXplorer.NodeWaiter && \
-    dotnet publish --output /app/ --configuration Release
-
-FROM microsoft/dotnet:2.1.6-runtime-stretch-slim-arm32v7 as final
+FROM arm32v7/debian:stretch-slim as final
 COPY --from=downloader /usr/bin/qemu-arm-static /usr/bin/qemu-arm-static
 COPY --from=downloader /opt/tini /usr/bin/tini
 RUN apt-get update && apt-get install -y --no-install-recommends socat inotify-tools \
     && rm -rf /var/lib/apt/lists/* 
 
 ENV LIGHTNINGD_DATA=/root/.lightning
-ENV LIGHTNINGD_PORT=9835
+ENV LIGHTNINGD_RPC_PORT=9835
+ENV LIGHTNINGD_PORT=9735
 
 RUN mkdir $LIGHTNINGD_DATA && \
     touch $LIGHTNINGD_DATA/config
@@ -121,7 +108,6 @@ VOLUME [ "/root/.lightning" ]
 COPY --from=builder /tmp/lightning_install/ /usr/local/
 COPY --from=downloader /opt/bitcoin/bin /usr/bin
 COPY --from=downloader /opt/litecoin/bin /usr/bin
-COPY --from=dotnetbuilder /app /opt/NBXplorer.NodeWaiter
 COPY tools/docker-entrypoint.sh entrypoint.sh
 
 EXPOSE 9735 9835
