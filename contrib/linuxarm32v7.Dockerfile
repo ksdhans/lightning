@@ -79,7 +79,6 @@ RUN wget -q https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz \
 && ./configure --disable-assembly --prefix=$QEMU_LD_PREFIX --host=${target_host} \
 && make \
 && make install && cd .. && rm gmp-6.1.2.tar.xz && rm -rf gmp-6.1.2
-
 COPY --from=downloader /usr/bin/qemu-arm-static /usr/bin/qemu-arm-static
 WORKDIR /opt/lightningd
 COPY . /tmp/lightning
@@ -89,7 +88,21 @@ RUN git clone --recursive /tmp/lightning . && \
 ARG DEVELOPER=0
 RUN ./configure --enable-static && make -j3 DEVELOPER=${DEVELOPER} && cp lightningd/lightning* cli/lightning-cli /usr/bin/
 
-FROM arm32v7/debian:stretch-slim as final
+# This is a manifest image, will pull the image with the same arch as the builder machine
+FROM microsoft/dotnet:2.1.500-sdk AS dotnetbuilder
+
+RUN apt-get -y update && apt-get -y install git
+
+WORKDIR /source
+
+RUN git clone https://github.com/dgarage/NBXplorer && cd NBXplorer && git checkout de6245f0c90a07a676a2df2531bc8e553150a558
+
+# Cache some dependencies
+RUN cd NBXplorer/NBXplorer.NodeWaiter && dotnet restore && cd ..
+RUN cd NBXplorer/NBXplorer.NodeWaiter && \
+    dotnet publish --output /app/ --configuration Release
+
+FROM microsoft/dotnet:2.1.6-runtime-stretch-slim-arm32v7 as final
 COPY --from=downloader /usr/bin/qemu-arm-static /usr/bin/qemu-arm-static
 RUN apt-get update && apt-get install -y --no-install-recommends socat inotify-tools \
     && rm -rf /var/lib/apt/lists/* 
@@ -105,6 +118,7 @@ COPY --from=builder /opt/lightningd/cli/lightning-cli /usr/bin
 COPY --from=builder /opt/lightningd/lightningd/lightning* /usr/bin/
 COPY --from=downloader /opt/bitcoin/bin /usr/bin
 COPY --from=downloader /opt/litecoin/bin /usr/bin
+COPY --from=dotnetbuilder /app /opt/NBXplorer.NodeWaiter
 COPY tools/docker-entrypoint.sh entrypoint.sh
 
 EXPOSE 9735 9835
