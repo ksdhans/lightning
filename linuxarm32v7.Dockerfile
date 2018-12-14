@@ -34,12 +34,29 @@ RUN mkdir /opt/litecoin && cd /opt/litecoin \
     && tar -xzvf litecoin.tar.gz $BD/litecoin-cli --strip-components=1 --exclude=*-qt \
     && rm litecoin.tar.gz
 
-FROM arm32v7/debian:stretch-slim as builder
+FROM arm32v7/debian:stretch-slim as armbuilder
+COPY --from=downloader /usr/bin/qemu-arm-static /usr/bin/qemu-arm-static
+RUN apt-get update && apt-get install -y --no-install-recommends libgmp-dev libsqlite3-dev zlib1g-dev
+
+FROM debian:stretch-slim as builder
 
 COPY --from=downloader /usr/bin/qemu-arm-static /usr/bin/qemu-arm-static
 ENV LIGHTNINGD_VERSION=master
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates autoconf automake build-essential git libtool python python3 wget gnupg dirmngr git \
-  libgmp-dev libsqlite3-dev zlib1g-dev
+  libgomp1-armhf-cross libc6-armhf-cross gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+
+COPY --from=armbuilder /usr/lib/arm-linux-gnueabihf/libgmp* /usr/arm-linux-gnueabihf/lib/
+COPY --from=armbuilder /usr/lib/arm-linux-gnueabihf/libz* /usr/arm-linux-gnueabihf/lib/
+COPY --from=armbuilder /usr/lib/arm-linux-gnueabihf/libsqlite3* /usr/arm-linux-gnueabihf/lib/
+
+ENV target_host=arm-linux-gnueabihf
+ENV AR=${target_host}-ar
+ENV AS=${target_host}-as
+ENV CC=${target_host}-gcc
+ENV CXX=${target_host}-g++
+ENV LD=${target_host}-ld
+ENV STRIP=${target_host}-strip
+ENV QEMU_LD_PREFIX=/usr/arm-linux-gnueabihf
 
 WORKDIR /opt/lightningd
 COPY . .
