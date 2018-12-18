@@ -48,8 +48,7 @@ CC=${target_host}-gcc \
 CXX=${target_host}-g++ \
 LD=${target_host}-ld \
 STRIP=${target_host}-strip \
-QEMU_LD_PREFIX=/usr/${target_host} \
-HOST=${target_host}
+QEMU_LD_PREFIX=/usr/${target_host}
 
 RUN wget -q https://zlib.net/zlib-1.2.11.tar.gz \
 && tar xvf zlib-1.2.11.tar.gz \
@@ -62,14 +61,14 @@ RUN apt-get install -y --no-install-recommends unzip tclsh \
 && wget -q https://www.sqlite.org/2018/sqlite-src-3260000.zip \
 && unzip sqlite-src-3260000.zip \
 && cd sqlite-src-3260000 \
-&& ./configure --enable-static --disable-readline --disable-threadsafe --disable-load-extension --host=${target_host} --prefix=$QEMU_LD_PREFIX \
+&& ./configure --enable-static --disable-readline --disable-threadsafe --disable-load-extension --prefix=$QEMU_LD_PREFIX \
 && make \
 && make install && cd .. && rm sqlite-src-3260000.zip && rm -rf sqlite-src-3260000
 
 RUN wget -q https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz \
 && tar xvf gmp-6.1.2.tar.xz \
 && cd gmp-6.1.2 \
-&& ./configure --disable-assembly --prefix=$QEMU_LD_PREFIX --host=${target_host} \
+&& ./configure --disable-assembly --prefix=$QEMU_LD_PREFIX \
 && make \
 && make install && cd .. && rm gmp-6.1.2.tar.xz && rm -rf gmp-6.1.2
 COPY --from=downloader /usr/bin/qemu-arm-static /usr/bin/qemu-arm-static
