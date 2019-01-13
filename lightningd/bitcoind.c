@@ -187,7 +187,7 @@ static void bcli_finished(struct io_conn *conn UNUSED, struct bitcoin_cli *bcli)
 		      WTERMSIG(status));
 
 	if (!bcli->exitstatus) {
-		if (WEXITSTATUS(status) != 0) {
+		if (WEXITSTATUS(status) != 0 && WEXITSTATUS(status) != 1) {
 			bcli_failure(bitcoind, bcli, WEXITSTATUS(status));
 			bitcoind->num_requests[prio]--;
 			goto done;
