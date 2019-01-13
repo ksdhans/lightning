@@ -134,19 +134,8 @@ static void bcli_failure(struct bitcoind *bitcoind,
 			 struct bitcoin_cli *bcli,
 			 int exitstatus)
 {
-	struct timerel t;
-
 	if (!bitcoind->error_count)
 		bitcoind->first_error_time = time_mono();
-
-	t = timemono_between(time_mono(), bitcoind->first_error_time);
-	if (time_greater(t, time_from_sec(60)))
-		fatal("%s exited %u (after %u other errors) '%.*s'",
-		      bcli_args(tmpctx, bcli),
-		      exitstatus,
-		      bitcoind->error_count,
-		      (int)bcli->output_bytes,
-		      bcli->output);
 
 	log_unusual(bitcoind->log,
 		    "%s exited with status %u",
