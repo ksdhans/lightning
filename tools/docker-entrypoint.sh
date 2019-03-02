@@ -78,7 +78,7 @@ fi
 
 if [ "$EXPOSE_TCP" == "true" ]; then
     set -m
-    lightningd "$@" &
+    lightningd --plugin-dir=/usr/libexec/c-lightning/plugins "$@" &
     echo "C-Lightning starting"
     while read -r i; do if [ "$i" = "lightning-rpc" ]; then break; fi; done \
     < <(inotifywait  -e create,open --format '%f' --quiet "$LIGHTNINGD_DATA" --monitor)
@@ -91,5 +91,5 @@ else
     # NBXplorer.NodeWaiter.dll is a wrapper which wait the full node to be fully synced before starting c-lightning
     # it also correctly handle SIGINT and SIGTERM so this container can die properly if SIGKILL or SIGTERM is sent
     exec dotnet /opt/NBXplorer.NodeWaiter/NBXplorer.NodeWaiter.dll --chains "$CHAIN" --network "$NETWORK" --explorerurl "$LIGHTNINGD_EXPLORERURL" -- \
-    lightningd "$@"
+    lightningd --plugin-dir=/usr/libexec/c-lightning/plugins "$@"
 fi
