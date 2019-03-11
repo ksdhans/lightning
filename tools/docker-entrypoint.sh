@@ -76,6 +76,23 @@ if [[ $REPLACEDNETWORK ]]; then
     echo "Replaced network $NETWORK by $REPLACEDNETWORK in $LIGHTNINGD_DATA/config"
 fi
 
+if [[ "${LIGHTNINGD_ANNOUNCEADDR}" ]]; then
+    # This allow to strip this parameter if LIGHTNINGD_ANNOUNCEADDR is not a proper domain
+    LIGHTNINGD_EXTERNAL_HOST=$(echo ${LIGHTNINGD_ANNOUNCEADDR} | cut -d ':' -f 1)
+    LIGHTNINGD_EXTERNAL_PORT=$(echo ${LIGHTNINGD_ANNOUNCEADDR} | cut -d ':' -f 2)
+    if [[ "$LIGHTNINGD_EXTERNAL_HOST" ]] && [[ "$LIGHTNINGD_EXTERNAL_PORT" ]]; then
+        echo "announce-addr=$LIGHTNINGD_ANNOUNCEADDR" >> "$LIGHTNINGD_DATA/config"
+        echo "announce-addr=$LIGHTNINGD_ANNOUNCEADDR added to $LIGHTNINGD_DATA/config"
+    fi
+fi
+
+if [[ "${LIGHTNINGD_ALIAS}" ]]; then
+    # This allow to strip this parameter if LND_ALIGHTNINGD_ALIASLIAS is empty or null, and truncate it
+    LIGHTNINGD_ALIAS="$(echo "$LIGHTNINGD_ALIAS" | cut -c -32)"
+    echo "alias=$LIGHTNINGD_ALIAS" >> "$LIGHTNINGD_DATA/config"
+    echo "alias=$LIGHTNINGD_ALIAS added to $LIGHTNINGD_DATA/config"
+fi
+
 if [ "$EXPOSE_TCP" == "true" ]; then
     set -m
     lightningd "$@" &
