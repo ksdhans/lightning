@@ -8,36 +8,38 @@ EOF
 
 : "${EXPOSE_TCP:=false}"
 
-NETWORK=$(sed -n 's/^network=\(.*\)$/\1/p' < "$LIGHTNINGD_DATA/config")
-CHAIN=$(sed -n 's/^chain=\(.*\)$/\1/p' < "$LIGHTNINGD_DATA/config")
-sed -i '/^chain=/d' "$LIGHTNINGD_DATA/config"
+LIGHTNINGD_NETWORK_NAME=""
+NBXPLORER_DATA_DIR_NAME=""
 
-if [[ ! $LIGHTNINGD_CHAIN ]]; then
-    CHAIN=$LIGHTNINGD_CHAIN
-fi
-if [[ ! $LIGHTNINGD_NETWORK ]]; then
-    NETWORK=$LIGHTNINGD_NETWORK
-fi
-
-REPLACEDNETWORK="";
-if [ "$CHAIN" == "btc" ]; then
-    if [ "$NETWORK" == "mainnet" ]; then
-        REPLACEDNETWORK="bitcoin"
-    fi
+if [ "$LIGHTNINGD_NETWORK" == "mainnet" ]; then
+    NBXPLORER_DATA_DIR_NAME="Main"
+elif [ "$LIGHTNINGD_NETWORK" == "testnet" ]; then
+    NBXPLORER_DATA_DIR_NAME="TestNet"
+elif [ "$LIGHTNINGD_NETWORK" == "regtest" ]; then
+    NBXPLORER_DATA_DIR_NAME="RegTest"
+else
+    echo "Invalid value for LIGHTNINGD_NETWORK (should be mainnet, testnet or regtest)"
+    exit
 fi
 
-if [ "$CHAIN" == "ltc" ]; then
-    if [ "$NETWORK" == "mainnet" ]; then
-        REPLACEDNETWORK="litecoin"
-    fi
-    if [ "$NETWORK" == "testnet" ]; then
-        REPLACEDNETWORK="litecoin-testnet"
-    fi
-    if [ "$NETWORK" == "regtest" ]; then
-        echo "REGTEST NOT AVAILABLE FOR LTC"
-        exit
-    fi
+if [ "$LIGHTNINGD_CHAIN" == "btc" ] && [ "$LIGHTNINGD_NETWORK" == "mainnet" ]; then
+    LIGHTNINGD_NETWORK_NAME="bitcoin"
+elif [ "$LIGHTNINGD_CHAIN" == "btc" ] && [ "$LIGHTNINGD_NETWORK" == "testnet" ]; then
+    LIGHTNINGD_NETWORK_NAME="testnet"
+elif [ "$LIGHTNINGD_CHAIN" == "btc" ] && [ "$LIGHTNINGD_NETWORK" == "regtest" ]; then
+    LIGHTNINGD_NETWORK_NAME="regtest"
+elif [ "$LIGHTNINGD_CHAIN" == "ltc" ] && [ "$LIGHTNINGD_NETWORK" == "mainnet" ]; then
+    LIGHTNINGD_NETWORK_NAME="litecoin"
+elif [ "$LIGHTNINGD_CHAIN" == "ltc" ] && [ "$LIGHTNINGD_NETWORK" == "testnet" ]; then
+    LIGHTNINGD_NETWORK_NAME="litecoin-testnet"
+else
+    echo "Invalid combinaion of LIGHTNINGD_NETWORK and LIGHTNINGD_CHAIN. LIGHTNINGD_CHAIN should be btc or ltc. LIGHTNINGD_NETWORK should be mainnet, testnet or regtest."
+    echo "ltc regtest is not supported"
+    exit
 fi
+
+echo "network=$LIGHTNINGD_NETWORK_NAME" >> "$LIGHTNINGD_DATA/config"
+echo "network=$LIGHTNINGD_NETWORK_NAME added in $LIGHTNINGD_DATA/config"
 
 if [[ $TRACE_TOOLS == "true" ]]; then
 echo "Trace tools detected, installing sample.sh..."
@@ -70,12 +72,6 @@ done
 chmod +x /usr/bin/sample-loop.sh
 fi
 
-if [[ $REPLACEDNETWORK ]]; then
-    sed -i '/^network=/d' "$LIGHTNINGD_DATA/config"
-    echo "network=$REPLACEDNETWORK" >> "$LIGHTNINGD_DATA/config"
-    echo "Replaced network $NETWORK by $REPLACEDNETWORK in $LIGHTNINGD_DATA/config"
-fi
-
 if [[ "${LIGHTNINGD_ANNOUNCEADDR}" ]]; then
     # This allow to strip this parameter if LIGHTNINGD_ANNOUNCEADDR is not a proper domain
     LIGHTNINGD_EXTERNAL_HOST=$(echo ${LIGHTNINGD_ANNOUNCEADDR} | cut -d ':' -f 1)
@@ -93,6 +89,13 @@ if [[ "${LIGHTNINGD_ALIAS}" ]]; then
     echo "alias=$LIGHTNINGD_ALIAS added to $LIGHTNINGD_DATA/config"
 fi
 
+if [[ "${LIGHTNINGD_NBXPLORER_ROOT}" ]]; then
+    NBXPLORER_READY_FILE="${LIGHTNINGD_NBXPLORER_ROOT}/${NBXPLORER_DATA_DIR_NAME}/${LIGHTNINGD_CHAIN}_fully_synched"
+    echo "Waiting $NBXPLORER_READY_FILE to be signaled by nbxplorer..."
+    while [ ! -f "$NBXPLORER_READY_FILE" ]; do sleep 1; done
+    echo "The chain is fully synched"
+fi
+
 if [ "$EXPOSE_TCP" == "true" ]; then
     set -m
     lightningd "$@" &
@@ -105,8 +108,5 @@ if [ "$EXPOSE_TCP" == "true" ]; then
     socat "TCP4-listen:$LIGHTNINGD_RPC_PORT,fork,reuseaddr" "UNIX-CONNECT:$LIGHTNINGD_DATA/lightning-rpc" &
     fg %-
 else
-    # NBXplorer.NodeWaiter.dll is a wrapper which wait the full node to be fully synced before starting c-lightning
-    # it also correctly handle SIGINT and SIGTERM so this container can die properly if SIGKILL or SIGTERM is sent
-    exec dotnet /opt/NBXplorer.NodeWaiter/NBXplorer.NodeWaiter.dll --chains "$CHAIN" --network "$NETWORK" --explorerurl "$LIGHTNINGD_EXPLORERURL" -- \
-    lightningd "$@"
+    exec lightningd "$@"
 fi

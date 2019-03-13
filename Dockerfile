@@ -63,21 +63,7 @@ RUN git clone --recursive /tmp/lightning . && \
 ARG DEVELOPER=0
 RUN ./configure --prefix=/tmp/lightning_install && make -j3 DEVELOPER=${DEVELOPER} && make install
 
-# This is a manifest image, will pull the image with the same arch as the builder machine
-FROM microsoft/dotnet:2.1.500-sdk AS dotnetbuilder
-
-RUN apt-get -y update && apt-get -y install git
-
-WORKDIR /source
-
-RUN git clone https://github.com/dgarage/NBXplorer && cd NBXplorer && git checkout de6245f0c90a07a676a2df2531bc8e553150a558
-
-# Cache some dependencies
-RUN cd NBXplorer/NBXplorer.NodeWaiter && dotnet restore && cd ..
-RUN cd NBXplorer/NBXplorer.NodeWaiter && \
-    dotnet publish --output /app/ --configuration Release
-
-FROM microsoft/dotnet:2.1.5-runtime-alpine3.7
+FROM alpine:3.7
 
 RUN apk add --no-cache \
      gmp-dev \
@@ -85,7 +71,8 @@ RUN apk add --no-cache \
      inotify-tools \
      socat \
      bash \
-     zlib-dev
+     zlib-dev \
+     tini
 
 ARG TRACE_TOOLS=false
 ENV TRACE_TOOLS=$TRACE_TOOLS
@@ -130,8 +117,7 @@ VOLUME [ "/root/.lightning" ]
 COPY --from=builder /tmp/lightning_install/ /usr/local/
 COPY --from=builder /opt/bitcoin/bin /usr/bin
 COPY --from=builder /opt/litecoin/bin /usr/bin
-COPY --from=dotnetbuilder /app /opt/NBXplorer.NodeWaiter
 COPY tools/docker-entrypoint.sh entrypoint.sh
 
 EXPOSE 9735 9835
-ENTRYPOINT  [ "./entrypoint.sh" ]
+ENTRYPOINT  [ "/sbin/tini", "-g", "--", "./entrypoint.sh" ]
