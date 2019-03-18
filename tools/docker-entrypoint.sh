@@ -4,23 +4,12 @@
 
 cat <<-EOF > "$LIGHTNINGD_DATA/config"
 ${LIGHTNINGD_OPT}
+bind-addr=0.0.0.0:${LIGHTNINGD_PORT}
 EOF
 
 : "${EXPOSE_TCP:=false}"
 
 LIGHTNINGD_NETWORK_NAME=""
-NBXPLORER_DATA_DIR_NAME=""
-
-if [ "$LIGHTNINGD_NETWORK" == "mainnet" ]; then
-    NBXPLORER_DATA_DIR_NAME="Main"
-elif [ "$LIGHTNINGD_NETWORK" == "testnet" ]; then
-    NBXPLORER_DATA_DIR_NAME="TestNet"
-elif [ "$LIGHTNINGD_NETWORK" == "regtest" ]; then
-    NBXPLORER_DATA_DIR_NAME="RegTest"
-else
-    echo "Invalid value for LIGHTNINGD_NETWORK (should be mainnet, testnet or regtest)"
-    exit
-fi
 
 if [ "$LIGHTNINGD_CHAIN" == "btc" ] && [ "$LIGHTNINGD_NETWORK" == "mainnet" ]; then
     LIGHTNINGD_NETWORK_NAME="bitcoin"
@@ -89,10 +78,9 @@ if [[ "${LIGHTNINGD_ALIAS}" ]]; then
     echo "alias=$LIGHTNINGD_ALIAS added to $LIGHTNINGD_DATA/config"
 fi
 
-if [[ "${LIGHTNINGD_NBXPLORER_ROOT}" ]]; then
-    NBXPLORER_READY_FILE="${LIGHTNINGD_NBXPLORER_ROOT}/${NBXPLORER_DATA_DIR_NAME}/${LIGHTNINGD_CHAIN}_fully_synched"
-    echo "Waiting $NBXPLORER_READY_FILE to be signaled by nbxplorer..."
-    while [ ! -f "$NBXPLORER_READY_FILE" ]; do sleep 1; done
+if [[ "${LIGHTNINGD_READY_FILE}" ]]; then
+    echo "Waiting $LIGHTNINGD_READY_FILE to be created..."
+    while [ ! -f "$LIGHTNINGD_READY_FILE" ]; do sleep 1; done
     echo "The chain is fully synched"
 fi
 
@@ -104,15 +92,14 @@ if [[ "${LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE}" ]]; then
     echo "announce-addr=$HIDDENSERVICE_ONION added to $LIGHTNINGD_DATA/config"
 fi
 
+echo "C-Lightning starting, listening on port ${LIGHTNINGD_PORT}"
 if [ "$EXPOSE_TCP" == "true" ]; then
     set -m
     lightningd "$@" &
     echo "C-Lightning starting"
     while read -r i; do if [ "$i" = "lightning-rpc" ]; then break; fi; done \
     < <(inotifywait  -e create,open --format '%f' --quiet "$LIGHTNINGD_DATA" --monitor)
-    echo "C-Lightning started"
     echo "C-Lightning started, RPC available on port $LIGHTNINGD_RPC_PORT"
-
     socat "TCP4-listen:$LIGHTNINGD_RPC_PORT,fork,reuseaddr" "UNIX-CONNECT:$LIGHTNINGD_DATA/lightning-rpc" &
     fg %-
 else
