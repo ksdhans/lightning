@@ -62,13 +62,7 @@ chmod +x /usr/bin/sample-loop.sh
 fi
 
 if [[ "${LIGHTNINGD_ANNOUNCEADDR}" ]]; then
-    # This allow to strip this parameter if LIGHTNINGD_ANNOUNCEADDR is not a proper domain
-    LIGHTNINGD_EXTERNAL_HOST=$(echo ${LIGHTNINGD_ANNOUNCEADDR} | cut -d ':' -f 1)
-    LIGHTNINGD_EXTERNAL_PORT=$(echo ${LIGHTNINGD_ANNOUNCEADDR} | cut -d ':' -f 2)
-    if [[ "$LIGHTNINGD_EXTERNAL_HOST" ]] && [[ "$LIGHTNINGD_EXTERNAL_PORT" ]]; then
-        echo "announce-addr=$LIGHTNINGD_ANNOUNCEADDR" >> "$LIGHTNINGD_DATA/config"
-        echo "announce-addr=$LIGHTNINGD_ANNOUNCEADDR added to $LIGHTNINGD_DATA/config"
-    fi
+    echo "announce-addr=$LIGHTNINGD_ANNOUNCEADDR" >> "$LIGHTNINGD_DATA/config"
 fi
 
 if [[ "${LIGHTNINGD_ALIAS}" ]]; then
@@ -87,7 +81,7 @@ fi
 if [[ "${LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE}" ]]; then
     echo "Waiting $LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE to be created by tor..."
     while [ ! -f "$LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE" ]; do sleep 1; done
-    HIDDENSERVICE_ONION="$(head -n 1 "$LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE"):$LIGHTNINGD_PORT"
+    HIDDENSERVICE_ONION="$(head -n 1 "$LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE")"
     echo "announce-addr=$HIDDENSERVICE_ONION" >> "$LIGHTNINGD_DATA/config"
     echo "announce-addr=$HIDDENSERVICE_ONION added to $LIGHTNINGD_DATA/config"
 fi
