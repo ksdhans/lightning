@@ -62,7 +62,7 @@ chmod +x /usr/bin/sample-loop.sh
 fi
 
 if [[ "${LIGHTNINGD_ANNOUNCEADDR}" ]]; then
-    echo "announce-addr=$LIGHTNINGD_ANNOUNCEADDR" >> "$LIGHTNINGD_DATA/config"
+    echo "announce-addr=$LIGHTNINGD_ANNOUNCEADDR:${LIGHTNINGD_PORT}" >> "$LIGHTNINGD_DATA/config"
 fi
 
 if [[ "${LIGHTNINGD_ALIAS}" ]]; then
@@ -81,7 +81,7 @@ fi
 if [[ "${LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE}" ]]; then
     echo "Waiting $LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE to be created by tor..."
     while [ ! -f "$LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE" ]; do sleep 1; done
-    HIDDENSERVICE_ONION="$(head -n 1 "$LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE")"
+    HIDDENSERVICE_ONION="$(head -n 1 "$LIGHTNINGD_HIDDENSERVICE_HOSTNAME_FILE"):${LIGHTNINGD_PORT}"
     echo "announce-addr=$HIDDENSERVICE_ONION" >> "$LIGHTNINGD_DATA/config"
     echo "announce-addr=$HIDDENSERVICE_ONION added to $LIGHTNINGD_DATA/config"
 fi
