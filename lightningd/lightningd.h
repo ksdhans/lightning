@@ -249,6 +249,9 @@ struct lightningd {
 	char *wallet_dsn;
 
 	bool encrypted_hsm;
+
+	/* Outstanding waitblockheight commands.  */
+	struct list_head waitblockheight_commands;
 };
 
 /* Turning this on allows a tal allocation to return NULL, rather than aborting.

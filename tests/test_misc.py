@@ -1993,7 +1993,7 @@ def test_new_node_is_mainnet(node_factory):
     assert os.path.isfile(os.path.join(basedir, "lightningd-bitcoin.pid"))
 
 
-def test_unicode_rpc(node_factory):
+def test_unicode_rpc(node_factory, executor, bitcoind):
     node = node_factory.get_node()
     desc = "Some candy 🍬 and a nice glass of milk 🥛."
 
@@ -2002,3 +2002,41 @@ def test_unicode_rpc(node_factory):
     assert(len(invoices) == 1)
     assert(invoices[0]['description'] == desc)
     assert(invoices[0]['label'] == desc)
+
+
+def test_waitblockheight(node_factory, executor, bitcoind):
+    node = node_factory.get_node()
+
+    sync_blockheight(bitcoind, [node])
+
+    blockheight = node.rpc.getinfo()['blockheight']
+
+    # Should succeed without waiting.
+    node.rpc.waitblockheight(blockheight - 2)
+    node.rpc.waitblockheight(blockheight - 1)
+    node.rpc.waitblockheight(blockheight)
+
+    # Should not succeed yet.
+    fut2 = executor.submit(node.rpc.waitblockheight, blockheight + 2)
+    fut1 = executor.submit(node.rpc.waitblockheight, blockheight + 1)
+    assert not fut1.done()
+    assert not fut2.done()
+
+    # Should take about ~1second and time out.
+    with pytest.raises(RpcError):
+        node.rpc.waitblockheight(blockheight + 2, 1)
+
+    # Others should still not be done.
+    assert not fut1.done()
+    assert not fut2.done()
+
+    # Trigger just one more block.
+    bitcoind.generate_block(1)
+    sync_blockheight(bitcoind, [node])
+    fut1.result(5)
+    assert not fut2.done()
+
+    # Trigger two blocks.
+    bitcoind.generate_block(1)
+    sync_blockheight(bitcoind, [node])
+    fut2.result(5)
