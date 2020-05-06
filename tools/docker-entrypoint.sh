@@ -63,6 +63,7 @@ fi
 
 if [[ "${LIGHTNINGD_ANNOUNCEADDR}" ]]; then
     echo "announce-addr=$LIGHTNINGD_ANNOUNCEADDR:${LIGHTNINGD_PORT}" >> "$LIGHTNINGD_DATA/config"
+    echo "announce-addr=$LIGHTNINGD_ANNOUNCEADDR:${LIGHTNINGD_PORT} added to $LIGHTNINGD_DATA/config"
 fi
 
 if [[ "${LIGHTNINGD_ALIAS}" ]]; then
