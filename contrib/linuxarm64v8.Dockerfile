@@ -32,10 +32,10 @@ RUN mkdir /opt/bitcoin && cd /opt/bitcoin \
     && tar -xzvf $BITCOIN_TARBALL $BD/bitcoin-cli --strip-components=1 \
     && rm $BITCOIN_TARBALL
 
-ENV LITECOIN_VERSION 0.14.2
+ENV LITECOIN_VERSION 0.18.1
 ENV LITECOIN_TARBALL litecoin-$LITECOIN_VERSION-aarch64-linux-gnu.tar.gz
 ENV LITECOIN_URL https://download.litecoin.org/litecoin-$LITECOIN_VERSION/linux/$LITECOIN_TARBALL
-ENV LITECOIN_SHA256 69449c3c8206f75cfdef929562b323326f1d0496f77f82608f9a974cbb2fd373
+ENV LITECOIN_SHA256 e0bdd4aa81502551a0c5abcfaae52c8bbaf4a980548aa6c91053643d81924b51
 
 # install litecoin binaries
 RUN mkdir /opt/litecoin && cd /opt/litecoin \
@@ -99,6 +99,7 @@ RUN git clone --recursive /tmp/lightning . && \
 ARG DEVELOPER=0
 ENV PYTHON_VERSION=3
 RUN pip3 install mrkd
+RUN pip3 install --user mrkd mistune==0.8.4
 RUN ./configure --prefix=/tmp/lightning_install --enable-static && make -j3 DEVELOPER=${DEVELOPER} && make install
 
 FROM arm64v8/debian:buster-slim as final
